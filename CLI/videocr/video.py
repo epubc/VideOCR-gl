@@ -427,114 +427,71 @@ class Video:
 
             success = True
 
-        except KeyboardInterrupt:
-            raise
+            if len(self.frame_timestamps) > 1:
+                min_idx = min(self.frame_timestamps.keys())
+                max_idx = max(self.frame_timestamps.keys())
+                if max_idx > min_idx:
+                    total_duration = self.frame_timestamps[max_idx] - self.frame_timestamps[min_idx]
+                    self.avg_frame_duration_ms = total_duration / (max_idx - min_idx)
 
-        finally:
-            is_aborting = not success or len(error_list) > 0
-
-            if is_aborting:
-                stop_event.set()
+            # --- NEW GOOGLE CLOUD VISION API LOGIC ---
+            print("Starting Google Cloud Vision OCR... This can take a while...", flush=True)
+            
+            # Dynamically inject the credentials from the GUI
+            if google_credentials and os.path.isfile(google_credentials):
+                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_credentials
             else:
-                drain_event.set()
-
-            while not raw_queue.empty():
-                try:
-                    raw_queue.get_nowait()
-                except queue.Empty:
-                    break
-
-            while not processed_queue.empty():
-                try:
-                    processed_queue.get_nowait()
-                except queue.Empty:
-                    break
-
-            if is_aborting:
-                while not write_queue.empty():
-                    try:
-                        write_queue.get_nowait()
-                    except queue.Empty:
-                        break
-
-            producer.join()
-            for w in workers:
-                w.join()
-            for w in writers:
-                w.join()
-
-            if error_list or is_aborting:
-                shutil.rmtree(temp_dir, ignore_errors=True)
-            if error_list:
-                raise error_list[0]
-
-        ocr_end = expected_index if expected_index is not None else 0
-
-        if len(self.frame_timestamps) > 1:
-            min_idx = min(self.frame_timestamps.keys())
-            max_idx = max(self.frame_timestamps.keys())
-            if max_idx > min_idx:
-                total_duration = self.frame_timestamps[max_idx] - self.frame_timestamps[min_idx]
-                self.avg_frame_duration_ms = total_duration / (max_idx - min_idx)
-
-        # --- NEW GOOGLE CLOUD VISION API LOGIC ---
-        print("Starting Google Cloud Vision OCR... This can take a while...", flush=True)
-        
-        # Dynamically inject the credentials from the GUI
-        if google_credentials and os.path.isfile(google_credentials):
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_credentials
-        else:
-            print("Warning: Google Credentials not provided or invalid path.", flush=True)
-        
-        # Initialize the Vision API client
-        client = vision.ImageAnnotatorClient()
-        
-        # Tell Google to prioritize the language selected in the GUI
-        image_context = vision.ImageContext(language_hints=[lang])
-        
-        ocr_outputs = {}
-        total_images = len(frame_paths)
-
-        for i, path in enumerate(frame_paths):
-            print(f"\rStep 2: Performing OCR on image {i + 1} of {total_images}", end="", flush=True)
-            frame_filename = os.path.basename(path)
+                print("Warning: Google Credentials not provided or invalid path.", flush=True)
             
-            # Read the image file into memory
-            with io.open(path, 'rb') as image_file:
-                content = image_file.read()
-            image = vision.Image(content=content)
+            # Initialize the Vision API client
+            client = vision.ImageAnnotatorClient()
             
-            # Call the Vision API (DOCUMENT_TEXT_DETECTION is best for dense text/subtitles)
-            response = client.document_text_detection(image=image)
+            # Tell Google to prioritize the language selected in the GUI
+            image_context = vision.ImageContext(language_hints=[lang])
             
-            if response.error.message:
-                raise Exception(f"Vision API Error: {response.error.message}")
-            
-            frame_preds = []
-            
-            # Parse the Vision API response into the format VideOCR expects
-            if response.full_text_annotation:
-                for page in response.full_text_annotation.pages:
-                    for block in page.blocks:
-                        for paragraph in block.paragraphs:
-                            for word in paragraph.words:
-                                # Combine symbols into a single word string
-                                word_text = ''.join([symbol.text for symbol in word.symbols])
-                                
-                                # Vision API confidence is 0.0 to 1.0. VideOCR expects 0 to 100.
-                                conf = word.confidence * 100
-                                
-                                # Extract the 4 vertices of the bounding box
-                                # We use getattr to default to 0 if x or y is perfectly on the edge
-                                bbox = [[getattr(v, 'x', 0), getattr(v, 'y', 0)] for v in word.bounding_box.vertices]
-                                
-                                # Append in the exact structure VideOCR uses internally
-                                frame_preds.append([bbox, [word_text, conf]])
-            
-            ocr_outputs[frame_filename] = frame_preds
-            
-        print() # Print a newline after the progress bar finishes
-        # --- END NEW GOOGLE CLOUD VISION API LOGIC ---
+            ocr_outputs = {}
+            total_images = len(frame_paths)
+
+            for i, path in enumerate(frame_paths):
+                print(f"\rStep 2: Performing OCR on image {i + 1} of {total_images}", end="", flush=True)
+                frame_filename = os.path.basename(path)
+                
+                # Read the image file into memory
+                with io.open(path, 'rb') as image_file:
+                    content = image_file.read()
+                image = vision.Image(content=content)
+                
+                # Call the Vision API (DOCUMENT_TEXT_DETECTION is best for dense text/subtitles)
+                response = client.document_text_detection(image=image, image_context=image_context)
+                
+                if response.error.message:
+                    raise Exception(f"Vision API Error: {response.error.message}")
+                
+                frame_preds = []
+                
+                # Parse the Vision API response into the format VideOCR expects
+                if response.full_text_annotation:
+                    for page in response.full_text_annotation.pages:
+                        for block in page.blocks:
+                            for paragraph in block.paragraphs:
+                                for word in paragraph.words:
+                                    # Combine symbols into a single word string
+                                    word_text = ''.join([symbol.text for symbol in word.symbols])
+                                    
+                                    # Vision API confidence is 0.0 to 1.0. VideOCR expects 0 to 100.
+                                    conf = word.confidence * 100
+                                    
+                                    # Extract the 4 vertices of the bounding box
+                                    # We use getattr to default to 0 if x or y is perfectly on the edge
+                                    bbox = [[getattr(v, 'x', 0), getattr(v, 'y', 0)] for v in word.bounding_box.vertices]
+                                    
+                                    # Append in the exact structure VideOCR uses internally
+                                    frame_preds.append([bbox, [word_text, conf]])
+                
+                ocr_outputs[frame_filename] = frame_preds
+                
+            print() # Print a newline after the progress bar finishes
+            # --- END NEW GOOGLE CLOUD VISION API LOGIC ---
 
             # Map to predicted_frames for each zone
             frame_predictions_dict: dict[int, dict[int, PredictedFrames]] = {0: {}, 1: {}}
@@ -573,14 +530,43 @@ class Video:
             self.pred_frames_zone1 = frame_predictions_list.get(0, [])
             self.pred_frames_zone2 = frame_predictions_list.get(1, [])
 
-        except KeyboardInterrupt:
-            if process is not None and process.poll() is None:
-                process.terminate()
-                process.wait()
-            raise
-
         finally:
+            is_aborting = not success or len(error_list) > 0
+
+            if is_aborting:
+                stop_event.set()
+            else:
+                drain_event.set()
+
+            while not raw_queue.empty():
+                try:
+                    raw_queue.get_nowait()
+                except queue.Empty:
+                    break
+
+            while not processed_queue.empty():
+                try:
+                    processed_queue.get_nowait()
+                except queue.Empty:
+                    break
+
+            if is_aborting:
+                while not write_queue.empty():
+                    try:
+                        write_queue.get_nowait()
+                    except queue.Empty:
+                        break
+
+            producer.join()
+            for w in workers:
+                w.join()
+            for w in writers:
+                w.join()
+
             shutil.rmtree(temp_dir, ignore_errors=True)
+            
+            if error_list:
+                raise error_list[0]
 
     def get_subtitles(self, sim_threshold: int, max_merge_gap_sec: float, lang: str, post_processing: bool, min_subtitle_duration_sec: float, subtitle_alignments: list[str | None]) -> str:
         self._generate_subtitles(sim_threshold, max_merge_gap_sec, lang, post_processing, min_subtitle_duration_sec, subtitle_alignments)
