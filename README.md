@@ -13,11 +13,7 @@ Just a fork from VideOCR, for the Vietnamese language, using Google Cloud Vision
 
 ## ℹ About
 
-Extract hardcoded (burned-in) subtitles from videos via a simple to use GUI by utilizing the [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) OCR engine. Everything can be easily configured via a few clicks.
-
-This repository also provides a version of VideOCR that can be used from the command line in combination with PaddleOCR.
-
-The latest release incorporates the newest version of PaddleOCR with greatly improved OCR capabilities.
+Extract hardcoded (burned-in) subtitles from videos via a simple to use GUI by utilizing the Google Cloud Vision AI OCR engine. Everything can be easily configured via a few clicks.
 
 ## Setup
 
@@ -201,6 +197,9 @@ Input Video Quality       | Use lower quality           | Use higher quality  | 
       ```bash
       cd VideOCR
       pip install . --group all
+      pip install -e ".[dev]"
+      pip install google-cloud-vision
+      pip install wakepy av cpuid Fast-SSIM opencc opencv-python-headless psutil pymediainfo thefuzz wordninja-enhanced google-cloud-vision
       ```
     - Execute the build script to create the desired build:
       ```bash
