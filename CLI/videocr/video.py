@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import io
+from google.cloud import vision
+
 import ast
 import os
 import queue
@@ -59,7 +62,8 @@ class Video:
 
     def run_ocr(self, use_gpu: bool, lang: str, use_angle_cls: bool, time_start: str, time_end: str, conf_threshold: int,
                 use_fullframe: bool, brightness_threshold: int | None, ssim_threshold: int, subtitle_position: str,
-                frames_to_skip: int, crop_zones: list[dict[str, int]], ocr_image_max_width: int, normalize_to_simplified_chinese: bool) -> None:
+                frames_to_skip: int, crop_zones: list[dict], ocr_image_max_width: int, normalize_to_simplified_chinese: bool,
+                google_credentials: str) -> None:
         conf_threshold_ratio = conf_threshold / 100
         ssim_threshold_ratio = ssim_threshold / 100
         self.lang = lang
@@ -473,94 +477,64 @@ class Video:
                 total_duration = self.frame_timestamps[max_idx] - self.frame_timestamps[min_idx]
                 self.avg_frame_duration_ms = total_duration / (max_idx - min_idx)
 
-        # Run PaddleOCR
-        env = os.environ.copy()
-        env["PYTHONIOENCODING"] = "utf-8"
-        args = [
-            self.paddleocr_path,
-            "ocr",
-            "--input", temp_dir,
-            "--device", "gpu" if use_gpu else "cpu",
-            "--use_textline_orientation", "true" if use_angle_cls else "false",
-            "--use_doc_orientation_classify", "False",
-            "--use_doc_unwarping", "False",
-            "--lang", self.lang,
-        ]
+        # --- NEW GOOGLE CLOUD VISION API LOGIC ---
+        print("Starting Google Cloud Vision OCR... This can take a while...", flush=True)
+        
+        # Dynamically inject the credentials from the GUI
+        if google_credentials and os.path.isfile(google_credentials):
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_credentials
+        else:
+            print("Warning: Google Credentials not provided or invalid path.", flush=True)
+        
+        # Initialize the Vision API client
+        client = vision.ImageAnnotatorClient()
+        
+        # Tell Google to prioritize the language selected in the GUI
+        image_context = vision.ImageContext(language_hints=[lang])
+        
+        ocr_outputs = {}
+        total_images = len(frame_paths)
 
-        if self.det_model_dir:
-            args += ["--text_detection_model_dir", self.det_model_dir]
-            args += ["--text_detection_model_name", os.path.basename(self.det_model_dir)]
-        if self.rec_model_dir:
-            args += ["--text_recognition_model_dir", self.rec_model_dir]
-            args += ["--text_recognition_model_name", os.path.basename(self.rec_model_dir)]
-        if self.cls_model_dir and use_angle_cls:
-            args += ["--textline_orientation_model_dir", self.cls_model_dir]
-            args += ["--textline_orientation_model_name", os.path.basename(self.cls_model_dir)]
-
-        print("Starting PaddleOCR...", flush=True)
-
-        if not os.path.isfile(self.paddleocr_path):
-            raise OSError(f"PaddleOCR executable not found at: {self.paddleocr_path}")
-
-        process = None
-
-        try:
-            process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", env=env, bufsize=1)
-
-            assert process.stdout is not None
-            assert process.stderr is not None
-
-            stdout_lines: list[str] = []
-            stderr_lines: list[str] = []
-
-            stderr_thread = threading.Thread(target=utils.read_pipe, args=(process.stderr, stderr_lines))
-            stderr_thread.start()
-
-            ocr_outputs: dict[str, list[Any]] = {}
-            current_image = None
-            total_images = len(frame_paths)
-            ocr_image_index = 0
-            try:
-                for line in iter(process.stdout.readline, ''):
-                    stdout_lines.append(line)
-                    line = line.strip()
-
-                    if "ppocr INFO: **********" in line:
-                        match = re.search(r"\*+(.+?)\*+$", line)
-                        if match:
-                            current_image = os.path.basename(match.group(1)).strip()
-                            ocr_outputs[current_image] = []
-                            ocr_image_index += 1
-                            print(f"\rStep 2/2: Performing OCR on image {ocr_image_index} of {total_images}", end="", flush=True)
-                    elif current_image and '[[' in line:
-                        try:
-                            match = re.search(r"ppocr INFO:\s*(\[.+\])", line)
-                            if match:
-                                parsed = ast.literal_eval(match.group(1))
-                                ocr_outputs[current_image].append(parsed)
-                        except Exception as e:
-                            print(f"Error parsing OCR for {current_image}: {e}", flush=True)
-            finally:
-                process.stdout.close()
-
-            exit_code = process.wait()
-            stderr_thread.join()
-            print()
-
-            if exit_code != 0:
-                full_stdout = "".join(stdout_lines)
-                full_stderr = "".join(stderr_lines)
-
-                command_str = ' '.join(args)
-                log_message = (
-                    f"PaddleOCR process failed with exit code {exit_code}.\n"
-                    f"Command: {command_str}\n\n"
-                    f"--- STDOUT ---\n{full_stdout}\n\n"
-                    f"--- STDERR ---\n{full_stderr}\n"
-                )
-                log_file_path = utils.log_error(log_message, log_name="paddleocr_error.log")
-                print(f"Error: PaddleOCR failed. See the log file for technical details:\n{log_file_path}", flush=True)
-                sys.exit(1)
+        for i, path in enumerate(frame_paths):
+            print(f"\rStep 2: Performing OCR on image {i + 1} of {total_images}", end="", flush=True)
+            frame_filename = os.path.basename(path)
+            
+            # Read the image file into memory
+            with io.open(path, 'rb') as image_file:
+                content = image_file.read()
+            image = vision.Image(content=content)
+            
+            # Call the Vision API (DOCUMENT_TEXT_DETECTION is best for dense text/subtitles)
+            response = client.document_text_detection(image=image)
+            
+            if response.error.message:
+                raise Exception(f"Vision API Error: {response.error.message}")
+            
+            frame_preds = []
+            
+            # Parse the Vision API response into the format VideOCR expects
+            if response.full_text_annotation:
+                for page in response.full_text_annotation.pages:
+                    for block in page.blocks:
+                        for paragraph in block.paragraphs:
+                            for word in paragraph.words:
+                                # Combine symbols into a single word string
+                                word_text = ''.join([symbol.text for symbol in word.symbols])
+                                
+                                # Vision API confidence is 0.0 to 1.0. VideOCR expects 0 to 100.
+                                conf = word.confidence * 100
+                                
+                                # Extract the 4 vertices of the bounding box
+                                # We use getattr to default to 0 if x or y is perfectly on the edge
+                                bbox = [[getattr(v, 'x', 0), getattr(v, 'y', 0)] for v in word.bounding_box.vertices]
+                                
+                                # Append in the exact structure VideOCR uses internally
+                                frame_preds.append([bbox, [word_text, conf]])
+            
+            ocr_outputs[frame_filename] = frame_preds
+            
+        print() # Print a newline after the progress bar finishes
+        # --- END NEW GOOGLE CLOUD VISION API LOGIC ---
 
             # Map to predicted_frames for each zone
             frame_predictions_dict: dict[int, dict[int, PredictedFrames]] = {0: {}, 1: {}}
