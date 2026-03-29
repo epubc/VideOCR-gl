@@ -120,6 +120,7 @@ def valid_alignment_name(arg: str) -> str | None:
 def main() -> None:
     parser = argparse.ArgumentParser(description='Extract subtitles from video using PaddleOCR.')
 
+    parser.add_argument('--google_credentials', type=str, default='', help='Path to Google Cloud credentials.json')
     parser.add_argument('--video_path', type=valid_video_path, required=True, help='Path to the video file')
     parser.add_argument('--output', type=valid_output_path, default='subtitle.srt', help='Output SRT file path (default: subtitle.srt)')
     parser.add_argument('--lang', type=valid_language, default='ch', help='OCR language (default: ch)')
@@ -193,6 +194,8 @@ def main() -> None:
 
         with keep_awake_manager:
             save_subtitles_to_file(
+                ocr_image_max_width=args.ocr_image_max_width,
+                google_credentials=args.google_credentials,
                 video_path=args.video_path,
                 file_path=args.output,
                 lang=args.lang,
