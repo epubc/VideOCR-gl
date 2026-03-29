@@ -239,51 +239,11 @@ except Exception:
 LANGUAGE_CODE_TO_NATIVE_NAME = {
     'vi': 'Tiếng Việt',
     'en': 'English',
-    'de': 'Deutsch',
-    'ch': '中文',
-    'es': 'Español',
-    'fr': 'Français',
-    'pt': 'Português',
-    'it': 'Italiano',
-    'ar': 'العربية',
-    'ru': 'Русский',
-    'id': 'Bahasa Indonesia',
-    'th': 'ไทย',
-    'ko': '한국어',
-    'ja': '日本語',
 }
 
 # --- Language Data ---
 LANGUAGES_LIST = [
-    ('Abaza', 'abq'), ('Adyghe', 'ady'), ('Afrikaans', 'af'), ('Albanian', 'sq'),
-    ('Angika', 'ang'), ('Arabic', 'ar'), ('Avar', 'ava'), ('Azerbaijani', 'az'),
-    ('Baluchi', 'bal'), ('Bashkir', 'ba'), ('Basque', 'eu'), ('Belarusian', 'be'),
-    ('Bhojpuri', 'bho'), ('Bihari', 'bh'), ('Bosnian', 'bs'), ('Bulgarian', 'bg'),
-    ('Buryat', 'bua'), ('Catalan', 'ca'), ('Chechen', 'che'), ('Chinese & English', 'ch'),
-    ('Chinese Traditional', 'chinese_cht'), ('Chuvash', 'cv'), ('Croatian', 'hr'),
-    ('Czech', 'cs'), ('Danish', 'da'), ('Dargwa', 'dar'), ('Dutch', 'nl'),
-    ('English', 'en'), ('Estonian', 'et'), ('Finnish', 'fi'), ('French', 'fr'),
-    ('Galician', 'gl'), ('Georgian', 'ka'), ('German', 'german'), ('Goan Konkani', 'gom'),
-    ('Greek', 'el'), ('Haryanvi', 'bgc'), ('Hindi', 'hi'), ('Hungarian', 'hu'),
-    ('Icelandic', 'is'), ('Indonesian', 'id'), ('Ingush', 'inh'), ('Irish', 'ga'),
-    ('Italian', 'it'), ('Japanese', 'japan'), ('Kabardian', 'kbd'), ('Kalmyk', 'xal'),
-    ('Karakalpak', 'kaa'), ('Kazakh', 'kk'), ('Komi', 'kv'), ('Korean', 'korean'),
-    ('Kurdish', 'ku'), ('Kyrgyz', 'ky'), ('Lak', 'lbe'), ('Latin', 'la'),
-    ('Latvian', 'lv'), ('Lezghian', 'lez'), ('Lithuanian', 'lt'), ('Luxembourgish', 'lb'),
-    ('Macedonian', 'mk'), ('Magahi', 'mah'), ('Maithili', 'mai'), ('Malay', 'ms'),
-    ('Maltese', 'mt'), ('Maori', 'mi'), ('Marathi', 'mr'), ('Meadow Mari', 'mhr'),
-    ('Moldovan', 'mo'), ('Mongolian', 'mn'), ('Nagpuri', 'sck'), ('Nepali', 'ne'),
-    ('Newari', 'new'), ('Norwegian', 'no'), ('Occitan', 'oc'), ('Ossetian', 'os'),
-    ('Pali', 'pi'), ('Pashto', 'ps'), ('Persian', 'fa'), ('Polish', 'pl'),
-    ('Portuguese', 'pt'), ('Quechua', 'qu'), ('Romansh', 'rm'), ('Romanian', 'ro'),
-    ('Russian', 'ru'), ('Sanskrit', 'sa'), ('Serbian(cyrillic)', 'rs_cyrillic'),
-    ('Serbian(latin)', 'rs_latin'), ('Sindhi', 'sd'), ('Slovak', 'sk'),
-    ('Slovenian', 'sl'), ('Spanish', 'es'), ('Swahili', 'sw'), ('Swedish', 'sv'),
-    ('Tabassaran', 'tab'), ('Tagalog', 'tl'), ('Tajik', 'tg'), ('Tamil', 'ta'),
-    ('Tatar', 'tt'), ('Telugu', 'te'), ('Thai', 'th'), ('Turkish', 'tr'),
-    ('Tuvan', 'tyv'), ('Udmurt', 'udm'), ('Ukrainian', 'uk'), ('Urdu', 'ur'),
-    ('Uyghur', 'ug'), ('Uzbek', 'uz'), ('Vietnamese', 'vi'), ('Welsh', 'cy'),
-    ('Sakha', 'sah'),
+    ('Vietnamese', 'vi'), ('English', 'en'),
 ]
 LANGUAGES_LIST.sort(key=lambda x: x[0])
 language_display_names = [lang[0] for lang in LANGUAGES_LIST]
@@ -306,7 +266,7 @@ PADDLE_TO_ISO_MAP = {
     'che': 'ce',
 }
 
-DEFAULT_DISPLAY_LANGUAGE = 'English'
+DEFAULT_DISPLAY_LANGUAGE = 'Vietnamese'
 
 # --- Subtitle Position Data ---
 SUBTITLE_POSITIONS_LIST = [
@@ -2099,7 +2059,7 @@ tab1_content = [
             [sg.Text("Output SRT:", size=(17, 1), key='-LBL-OUTPUT_SRT-'),
             sg.Input(key="--output", disabled_readonly_background_color=sg.theme_input_background_color(), readonly=True, disabled=True, size=(40, 1)), VerticalStrut()],
             [sg.Text("Subtitle Language:", size=(17, 1), key='-LBL-SUB_LANG-'),
-            sg.Combo(language_display_names, default_value=DEFAULT_DISPLAY_LANGUAGE, key="-LANG_COMBO-", size=(38, 1), readonly=True, enable_events=True, expand_x=True), VerticalStrut()],
+            sg.Combo(["Vietnamese", "English"], default_value="Vietnamese", key="-LANG_COMBO-", size=(38, 1), readonly=True, enable_events=True, expand_x=True), VerticalStrut()],
             [sg.Text("Subtitle Position:", size=(17, 1), key='-LBL-SUB_POS-'),
             sg.Combo([], key="-SUBTITLE_POS_COMBO-", size=(38, 4), readonly=True, enable_events=True, expand_x=True), VerticalStrut()],
         ], pad=(0, None)),
