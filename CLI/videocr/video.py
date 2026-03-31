@@ -375,7 +375,8 @@ class Video:
                             w = img.shape[1]
                             if subtitle_position == "center":
                                 w_margin = int(w * 0.35)
-                                sample = img[:, w_margin:w - w_margin]
+                                #sample = img[:, w_margin:w - w_margin]
+                                sample = img # Lấy toàn bộ vùng đã crop để so sánh thay vì chia margin
                             elif subtitle_position == "left":
                                 sample = img[:, :int(w * 0.3)]
                             elif subtitle_position == "right":
@@ -384,7 +385,10 @@ class Video:
                                 sample = img
                             else:
                                 raise ValueError(f"Invalid subtitle_position: {subtitle_position}")
-
+                        # Nếu ảnh gần như chỉ có 1 màu (đen hoặc xám), std sẽ rất thấp.
+                        if np.std(img) < 3.0: # Con số 3.0 có thể điều chỉnh (2.0 - 5.0)
+                            continue # Bỏ qua không lưu ảnh này
+                        # ------------------------
                         images_to_process.append({
                             'zone_idx': zone_idx,
                             'img': img,
