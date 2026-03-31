@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import io
 from contextlib import nullcontext
 from typing import Callable
 
@@ -44,6 +45,12 @@ SUPPORTED_LANGUAGES = (
     | DEVANAGARI_LANGS
 )
 
+
+# Ép buộc hệ thống sử dụng encoding UTF-8 cho đầu ra màn hình và lỗi
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # custom validators for argparse
 def valid_video_path(arg: str) -> str:

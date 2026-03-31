@@ -22,7 +22,94 @@ from PIL import Image
 from . import utils
 from .models import PredictedFrames, PredictedSubtitle
 from .pyav_adapter import Capture, get_video_properties
+import random
+import concurrent.futures
+from httpx import Client
+# Import các thành phần từ file lens.py (phải có file này trong thư mục)
+try:
+    from .lens import (AppliedFilter, LensOverlayFilterType, LensOverlayRoutingInfo, 
+                      LensOverlayServerRequest, LensOverlayServerResponse, Platform, Surface)
+except ImportError:
+    print("LỖI: Không tìm thấy file lens.py trong thư mục videocr!")
 
+class GoogleLensOCR:
+    """Class hỗ trợ gọi Google Lens API thay thế cho GCV"""
+    LENS_ENDPOINT = "https://lensfrontend-pa.googleapis.com/v1/crupload"
+    HEADERS = {
+        'Host': 'lensfrontend-pa.googleapis.com',
+        'Connection': 'keep-alive',
+        'Content-Type': 'application/x-protobuf',
+        'X-Goog-Api-Key': 'AIzaSyDr2UxVnv_U85AbhhY8XSHSIavUW0DC-sY',
+        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+    }
+
+    def __init__(self):
+        # Khởi tạo client httpx (không verify SSL để tránh lỗi cert)
+        self.client = Client(verify=False)
+
+    def __del__(self):
+        if hasattr(self, "client"):
+            self.client.close()
+
+    def get_image_info(self, image_path):
+        with Image.open(image_path) as img:
+            return img.width, img.height
+
+    def request_ocr(self, img_path: str):
+        """Hàm chính gửi ảnh lên Google Lens và nhận text"""
+        try:
+            width, height = self.get_image_info(img_path)
+            with open(img_path, 'rb') as f:
+                raw_bytes = f.read()
+
+            # Tạo Protobuf Request giống ePub_OCR
+            request = LensOverlayServerRequest()
+            request.objects_request.request_context.request_id.uuid = random.randint(0, 2**64 - 1)
+            request.objects_request.request_context.client_context.platform = Platform.WEB
+            request.objects_request.request_context.client_context.surface = Surface.CHROMIUM
+            
+            f_filter = AppliedFilter()
+            f_filter.filter_type = LensOverlayFilterType.AUTO_FILTER
+            request.objects_request.request_context.client_context.client_filters.filter.append(f_filter)
+            
+            request.objects_request.image_data.payload.image_bytes = raw_bytes
+            request.objects_request.image_data.image_metadata.width = width
+            request.objects_request.image_data.image_metadata.height = height
+
+            payload = request.SerializeToString()
+            
+            # Gửi yêu cầu
+            res = self.client.post(self.LENS_ENDPOINT, data=payload, headers=self.HEADERS, timeout=40)
+            
+            if res.status_code != 200:
+                return []
+
+            # Giải mã kết quả
+            response_proto = LensOverlayServerResponse().FromString(res.content)
+            response_dict = response_proto.to_dict()
+            
+            final_results = []
+            if 'objectsResponse' in response_dict and 'text' in response_dict['objectsResponse']:
+                text_data = response_dict['objectsResponse']['text']
+                if 'textLayout' in text_data and 'paragraphs' in text_data['textLayout']:
+                    paragraphs = text_data['textLayout']['paragraphs']
+                    for p in paragraphs:
+                        for line in p.get('lines', []):
+                            line_text = ""
+                            # Lấy tọa độ dòng (nếu có) hoặc tạo tọa độ giả
+                            # Google Lens trả về text theo line rất chuẩn
+                            for word in line.get('words', []):
+                                line_text += word.get('plainText', '') + word.get('textSeparator', '')
+                            
+                            if line_text.strip():
+                                # Định dạng trả về: [bbox, [text, confidence]]
+                                # Vì Lens trả về line, ta coi mỗi line là 1 khối text lớn
+                                # Tọa độ [0,0,0,0] vì logic Subtitle của bạn chủ yếu dùng text
+                                final_results.append([[[0,0],[width,0],[width,height],[0,height]], [line_text.strip(), 100.0]])
+            return final_results
+        except Exception as e:
+            print(f"Lỗi Lens API tại {img_path}: {e}")
+            return []
 
 class Video:
     path: str
@@ -63,7 +150,7 @@ class Video:
     def run_ocr(self, use_gpu: bool, lang: str, use_angle_cls: bool, time_start: str, time_end: str, conf_threshold: int,
                 use_fullframe: bool, brightness_threshold: int | None, ssim_threshold: int, subtitle_position: str,
                 frames_to_skip: int, crop_zones: list[dict], ocr_image_max_width: int, normalize_to_simplified_chinese: bool,
-                google_credentials: str) -> None:
+                google_credentials: str, threads: int = 6) -> None:
         conf_threshold_ratio = conf_threshold / 100
         ssim_threshold_ratio = ssim_threshold / 100
         self.lang = lang
@@ -439,74 +526,40 @@ class Video:
                     total_duration = self.frame_timestamps[max_idx] - self.frame_timestamps[min_idx]
                     self.avg_frame_duration_ms = total_duration / (max_idx - min_idx)
 
-            # --- NEW GOOGLE CLOUD VISION API LOGIC ---
-            print("Starting Google Cloud Vision OCR... This can take a while...", flush=True)
+            # --- GOOGLE LENS API INTEGRATION (REPLACING GCV) ---
+            print("Bắt đầu nhận diện Google Lens (Multi-threaded)...", flush=True)
             
-            # Dynamically inject the credentials from the GUI
-            if google_credentials and os.path.isfile(google_credentials):
-                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_credentials
-            else:
-                print("Warning: Google Credentials not provided or invalid path.", flush=True)
-            
-            # Initialize the Vision API client
-            client = vision.ImageAnnotatorClient()
-            
-            # Tell Google to prioritize the language selected in the GUI
-            image_context = vision.ImageContext(language_hints=[lang])
-            
+            lens_ocr = GoogleLensOCR()
             ocr_outputs = {}
             total_images = len(frame_paths)
-
-            for i, path in enumerate(frame_paths):
-                print(f"Step 2/2: Performing OCR on image {i + 1} of {total_images}...", flush=True)
-                frame_filename = os.path.basename(path)
+            
+            # Sử dụng ThreadPoolExecutor để chạy song song (nhanh hơn GCV rất nhiều)
+            # THREADS lấy từ tham số truyền vào của GUI (mặc định 6)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
+                future_to_frame = {
+                    executor.submit(lens_ocr.request_ocr, path): os.path.basename(path) 
+                    for path in frame_paths
+                }
                 
-                # Read the image file into memory
-                with io.open(path, 'rb') as image_file:
-                    content = image_file.read()
-                # Skip 0-byte ghost frames safely
-                if not content:
-                    ocr_outputs[frame_filename] = []
-                    continue
-                image = vision.Image(content=content)
-                try:
-                    # Call the Vision API (DOCUMENT_TEXT_DETECTION is best for dense text/subtitles)
-                    response = client.document_text_detection(image=image, image_context=image_context)
+                completed = 0
+                for future in concurrent.futures.as_completed(future_to_frame):
+                    frame_name = future_to_frame[future]
+                    try:
+                        results = future.result()
+                        ocr_outputs[frame_name] = results
+                    except Exception as e:
+                        try:
+                            print(f"Lỗi frame {frame_name}: {str(e)}".encode('utf-8', errors='replace').decode('utf-8'))
+                        except:
+                            pass
+                        ocr_outputs[frame_name] = []
                     
-                    if response.error.message:
-                        print(f"\nWarning: Google API rejected {frame_filename}: {response.error.message}. Skipping.", flush=True)
-                        ocr_outputs[frame_filename] = []
-                        continue
-                except Exception as e:
-                    print(f"\nWarning: API Call failed for {frame_filename}: {str(e)}. Skipping.", flush=True)
-                    ocr_outputs[frame_filename] = []
-                    continue
-                
-                frame_preds = []
-                
-                # Parse the Vision API response into the format VideOCR expects
-                if response.full_text_annotation:
-                    for page in response.full_text_annotation.pages:
-                        for block in page.blocks:
-                            for paragraph in block.paragraphs:
-                                for word in paragraph.words:
-                                    # Combine symbols into a single word string
-                                    word_text = ''.join([symbol.text for symbol in word.symbols])
-                                    
-                                    # Vision API confidence is 0.0 to 1.0. VideOCR expects 0 to 100.
-                                    conf = word.confidence * 100
-                                    
-                                    # Extract the 4 vertices of the bounding box
-                                    # We use getattr to default to 0 if x or y is perfectly on the edge
-                                    bbox = [[getattr(v, 'x', 0), getattr(v, 'y', 0)] for v in word.bounding_box.vertices]
-                                    
-                                    # Append in the exact structure VideOCR uses internally
-                                    frame_preds.append([bbox, [word_text, conf]])
-                
-                ocr_outputs[frame_filename] = frame_preds
-                
-            print() # Print a newline after the progress bar finishes
-            # --- END NEW GOOGLE CLOUD VISION API LOGIC ---
+                    completed += 1
+                    if completed % 5 == 0 or completed == total_images:
+                        print(f"\rBước 2/2: Google Lens OCR {completed}/{total_images}...", end="", flush=True)
+            
+            print("\nHoàn thành Google Lens OCR!")
+            # --- END GOOGLE LENS API ---
 
             # Map to predicted_frames for each zone
             frame_predictions_dict: dict[int, dict[int, PredictedFrames]] = {0: {}, 1: {}}

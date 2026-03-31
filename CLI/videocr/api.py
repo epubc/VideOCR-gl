@@ -28,7 +28,8 @@ def save_subtitles_to_file(
             use_gpu, lang, use_angle_cls, time_start, time_end, conf_threshold,
             use_fullframe, brightness_threshold, ssim_threshold, subtitle_position,
             frames_to_skip, crop_zones, ocr_image_max_width, normalize_to_simplified_chinese,
-            google_credentials
+            google_credentials,
+            threads=max_merge_gap_sec
         )
     except ValueError as e:
         print(f"Error: {e}", flush=True)

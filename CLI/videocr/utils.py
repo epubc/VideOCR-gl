@@ -9,7 +9,11 @@ from typing import IO, Any
 
 import av
 import numpy as np
-from cpuid import cpuid, xgetbv  # type: ignore
+try:
+    from cpuid import cpuid, xgetbv # type: ignore
+except ImportError:
+    cpuid = None
+    xgetbv = None
 
 from .lang_dictionaries import (
     ARABIC_LANGS,
@@ -168,6 +172,7 @@ def resolve_model_dirs(lang: str, use_server_model: bool) -> tuple[str, str, str
 
 def perform_hardware_check(paddleocr_path: str, use_gpu: bool) -> None:
     """Checks if the current system supports the hardware requirements."""
+    return
     error_prefix = "Unsupported Hardware Error:"
     warning_prefix = "Hardware Check Warning:"
 

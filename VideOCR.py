@@ -46,7 +46,7 @@ from typing import IO, Any, cast
 import av
 import numpy as np
 import psutil  # type: ignore
-import PySimpleGUI as sg  # type: ignore
+import FreeSimpleGUI as sg  # type: ignore
 from PIL import Image
 from wakepy import keep
 
@@ -177,10 +177,15 @@ def send_notification(title: str, message: str) -> None:
 
 # --- Determine VideOCR location ---
 def find_videocr_program() -> str | None:
-    """Determines the path to the videocr-cli executable (.exe or .bin)."""
+    """Xác định đường dẫn đến file videocr-cli (.exe, .bin hoặc .py)"""
+    # 1. Thử tìm file .py trong thư mục CLI (Dành cho chạy từ source)
+    script_path = os.path.join(APP_DIR, 'CLI', 'videocr_cli.py')
+    if os.path.exists(script_path):
+        return script_path
+
+    # 2. Thử tìm file thực thi (Dành cho bản đã đóng gói)
     program_name = 'videocr-cli'
     extension = ".exe" if sys.platform == "win32" else ".bin"
-
     root_path = os.path.join(APP_DIR, f'{program_name}{extension}')
     if os.path.exists(root_path):
         return root_path
@@ -1599,7 +1604,11 @@ def run_videocr(args_dict: dict[str, Any], window: sg.Window) -> bool:
         gui_queue.put(('-VIDEOCR_OUTPUT-', error_msg))
         return False
 
-    command = [VIDEOCR_PATH]
+    # Nếu VIDEOCR_PATH là file .py, chúng ta cần chạy bằng python interpreter
+    if VIDEOCR_PATH.endswith('.py'):
+        command = [sys.executable, VIDEOCR_PATH]
+    else:
+        command = [VIDEOCR_PATH]
 
     for key, value in args_dict.items():
         if value is not None and value != '':
@@ -1962,12 +1971,16 @@ def update_taskbar(state: str | None = None, progress: int | None = None) -> Non
     if prog is None:
         return
 
-    if state and state != previous_taskbar_state:
-        previous_taskbar_state = state
-        prog.setState(state)
+    try:
+        if state and state != previous_taskbar_state:
+            previous_taskbar_state = state
+            prog.setState(state)
 
-    if progress is not None:
-        prog.setProgress(progress)
+        if progress is not None:
+            prog.setProgress(progress)
+    except Exception as e:
+        # Nếu lỗi Taskbar thì bỏ qua để không làm dừng chương trình chính
+        pass
 
 
 def check_crop_validity(video_path: str, args: dict[str, Any]) -> tuple[bool, str | None]:
@@ -2349,9 +2362,29 @@ load_settings(window)
 update_gui_text(window)
 
 if sys.platform == 'win32':
-    prog = PyTaskbar.Progress(int(window.TKroot.wm_frame(), 16))
-    prog.init()
-    prog.setState('normal')
+    prog = None
+    try:
+        # Thử cách 1: Cấu trúc mới nhất của PyTaskbar (truy cập vào submodule taskbar)
+        import PyTaskbar.taskbar
+        prog = PyTaskbar.taskbar.Progress(int(window.TKroot.wm_frame(), 16))
+    except (ImportError, AttributeError):
+        try:
+            # Thử cách 2: Truy cập class nằm trong module trùng tên (Lỗi bạn đang gặp)
+            prog = PyTaskbar.ProgressAPI.ProgressAPI(int(window.TKroot.wm_frame(), 16))
+        except (AttributeError, TypeError):
+            try:
+                # Thử cách 3: Cấu trúc cũ
+                prog = PyTaskbar.Progress(int(window.TKroot.wm_frame(), 16))
+            except:
+                prog = None
+
+    # Nếu khởi tạo thành công đối tượng, mới tiến hành init
+    if prog is not None:
+        try:
+            prog.init()
+            prog.setState('normal')
+        except Exception:
+            prog = None # Vô hiệu hóa nếu init lỗi
 
 video_manager = VideoHandler()
 
