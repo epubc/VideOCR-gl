@@ -918,7 +918,6 @@ def get_translated_status(internal_status: str) -> str:
 def get_default_settings() -> dict[str, Any]:
     """Returns a dictionary of default settings."""
     return {
-    '--google_credentials': '',
     '--language': 'en',
     '-LANG_COMBO-': DEFAULT_DISPLAY_LANGUAGE,
     '-SUBTITLE_POS_COMBO-': DEFAULT_INTERNAL_SUBTITLE_POSITION,
@@ -1044,7 +1043,7 @@ def load_settings(window: sg.Window) -> None:
                 update_gui_scaling_combo(window, get_gui_scaling_index(saved_scaling))
 
                 settings_to_load = [
-                    ('--google_credentials', 'input'),
+                    #('--google_credentials', 'input'),
                     ('-LANG_COMBO-', 'combo_lang'),
                     ('--time_start', 'input'),
                     ('--time_end', 'input'),
@@ -2175,7 +2174,6 @@ tab2_content = [
     [sg.Text("VideOCR Settings:", font=("Arial", scale_font_size(10), "bold"), key='-LBL-VIDEOCR_SETTINGS-')],
     [
         sg.Column([
-            [sg.Text("Google Credentials JSON:", size=(30, 1), key='-LBL-GOOGLE-CRED-')],
             [sg.Text("UI Language:", size=(30, 1), key='-LBL-UI_LANG-'), VerticalStrut()],
             [sg.Text("GUI Scaling:", size=(30, 1), key='-LBL-GUI_SCALING-'), VerticalStrut()],
             [sg.Checkbox("Save Crop Box Selection", default=True, key="--save_crop_box", enable_events=True), VerticalStrut()],
@@ -2187,7 +2185,6 @@ tab2_content = [
             [sg.Checkbox("Check for Updates On Startup", default=True, key="--check_for_updates", enable_events=True), VerticalStrut()],
         ], pad=(0, None)),
         sg.Column([
-            [sg.Input("", key="--google_credentials", size=(34, 1), enable_events=True)],
             [sg.Combo(ui_language_display_names, key='-UI_LANG_COMBO-', size=(32, 1), readonly=True, enable_events=True, expand_x=True), VerticalStrut()],
             [sg.Combo([], key='gui_scaling', size=(32, 1), readonly=True, enable_events=True, expand_x=True), VerticalStrut()],
             [VerticalStrut()],
@@ -2199,7 +2196,6 @@ tab2_content = [
             [sg.Button("Check Now", key="-BTN-CHECK_UPDATE_MANUAL-")],
         ], pad=(0, None)),
         sg.Column([
-            [sg.FileBrowse("Browse...",target="--google_credentials", key="-BTN-BROWSE-CRED-", file_types=(("JSON Files", "*.json"), ("All Files", "*.*")))],
             [VerticalStrut()],
             [VerticalStrut()],
             [VerticalStrut()],
@@ -2576,7 +2572,6 @@ if not save_in_video_dir_checked_at_start:
 
 # --- Define the list of keys that, when changed, should trigger a settings save ---
 KEYS_TO_AUTOSAVE = [
-    '--google_credentials',
     '-UI_LANG_COMBO-',
     '-LANG_COMBO-',
     '-SUBTITLE_POS_COMBO-',
