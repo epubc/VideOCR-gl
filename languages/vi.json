@@ -166,7 +166,7 @@
     "status_queue_finished": "Hàng đợi đã hoàn thành",
     
     "progress_step1_prefix": "Bước 1/2:",
-    "progress_step2": "Bước 2/2: Đã thực hiện OCR trên hình ảnh {current} trên {total} ({percent}%)",
+    "progress_step2": "Bước 2/2: Đang OCR ảnh {current}/{total} ({percent}%)",
     "lbl_frame": "Khung hình",
     "cli_starting_ocr": "Đang khởi động PaddleOCR...",
     "cli_generating_subs": "Đang tạo phụ đề...",

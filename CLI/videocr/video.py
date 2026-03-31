@@ -546,7 +546,7 @@ class Video:
                     
                     completed += 1
                     if completed % 5 == 0 or completed == total_images:
-                        print(f"\rBước 2/2: Google Lens OCR {completed}/{total_images}...", end="", flush=True)
+                        print(f"Step 2/2: Performing OCR on image {completed} of {total_images}", flush=True)
             
             print("\nHoàn thành Google Lens OCR!")
             # --- END GOOGLE LENS API ---
