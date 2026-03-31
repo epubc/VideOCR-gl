@@ -6,8 +6,6 @@
 # nuitka-project: --include-data-files=Installer/*.ico=VideOCR.ico
 # nuitka-project: --include-data-files=Installer/*.png=VideOCR.png
 # nuitka-project: --include-data-dir=languages=languages
-# nuitka-project: --include-package=google.cloud.vision
-# nuitka-project: --include-package=grpc
 # nuitka-project: --include-package=comtypes
 
 # Windows-specific metadata for the executable
@@ -468,7 +466,6 @@ def update_gui_text(window: sg.Window, is_paused: bool = False) -> None:
         '--frames_to_skip': {'tooltip': 'tip_frames_skip'},
         '-LBL-MIN_DURATION-': {'text': 'lbl_min_duration', 'tooltip': 'tip_min_duration'},
         '--min_subtitle_duration': {'tooltip': 'tip_min_duration'},
-        '--use_gpu': {'text': 'chk_use_gpu', 'tooltip': 'tip_use_gpu'},
         '--use_fullframe': {'text': 'chk_full_frame', 'tooltip': 'tip_full_frame'},
         '--use_dual_zone': {'text': 'chk_dual_zone', 'tooltip': 'tip_dual_zone'},
         'enable_subtitle_alignment': {'text': 'chk_enable_subtitle_alignment', 'tooltip': 'tip_enable_subtitle_alignment'},
@@ -476,9 +473,7 @@ def update_gui_text(window: sg.Window, is_paused: bool = False) -> None:
         '--subtitle_alignment': {'tooltip': 'tip_subtitle_alignment1'},
         '-LBL-SUBTITLE-ALIGNMENT2-': {'text': 'lbl_subtitle_alignment2', 'tooltip': 'tip_subtitle_alignment2'},
         '--subtitle_alignment2': {'tooltip': 'tip_subtitle_alignment2'},
-        '--use_angle_cls': {'text': 'chk_angle_cls', 'tooltip': 'tip_angle_cls'},
         '--post_processing': {'text': 'chk_post_processing', 'tooltip': 'tip_post_processing'},
-        '--use_server_model': {'text': 'chk_server_model', 'tooltip': 'tip_server_model'},
         '-LBL-VIDEOCR_SETTINGS-': {'text': 'lbl_videocr_settings'},
         '-LBL-UI_LANG-': {'text': 'lbl_ui_lang', 'tooltip': 'tip_ui_lang'},
         '-UI_LANG_COMBO-': {'tooltip': 'tip_ui_lang'},
@@ -932,11 +927,8 @@ def get_default_settings() -> dict[str, Any]:
     '--ocr_image_max_width': str(DEFAULT_OCR_IMAGE_MAX_WIDTH),
     '--frames_to_skip': str(DEFAULT_FRAMES_TO_SKIP),
     '--use_fullframe': False,
-    '--use_gpu': True,
-    '--use_angle_cls': False,
     '--post_processing': False,
     '--min_subtitle_duration': str(DEFAULT_MIN_SUBTITLE_DURATION),
-    '--use_server_model': False,
     '--use_dual_zone': False,
     'enable_subtitle_alignment': False,
     '--subtitle_alignment': DEFAULT_SUBTITLE_ALIGNMENT,
@@ -1043,7 +1035,6 @@ def load_settings(window: sg.Window) -> None:
                 update_gui_scaling_combo(window, get_gui_scaling_index(saved_scaling))
 
                 settings_to_load = [
-                    #('--google_credentials', 'input'),
                     ('-LANG_COMBO-', 'combo_lang'),
                     ('--time_start', 'input'),
                     ('--time_end', 'input'),
@@ -1055,11 +1046,8 @@ def load_settings(window: sg.Window) -> None:
                     ('--ocr_image_max_width', 'input'),
                     ('--frames_to_skip', 'input'),
                     ('--use_fullframe', 'checkbox'),
-                    ('--use_gpu', 'checkbox'),
-                    ('--use_angle_cls', 'checkbox'),
                     ('--post_processing', 'checkbox'),
                     ('--min_subtitle_duration', 'input'),
-                    ('--use_server_model', 'checkbox'),
                     ('--use_dual_zone', 'checkbox'),
                     ('enable_subtitle_alignment', 'checkbox'),
                     ('--keyboard_seek_step', 'input'),
@@ -2158,7 +2146,6 @@ tab2_content = [
      sg.Input(DEFAULT_FRAMES_TO_SKIP, key="--frames_to_skip", size=(10, 1), enable_events=True)],
     [sg.Text("Minimum Subtitle Duration (seconds):", size=(38, 1), key='-LBL-MIN_DURATION-'),
      sg.Input(DEFAULT_MIN_SUBTITLE_DURATION, key="--min_subtitle_duration", size=(10, 1), enable_events=True)],
-    [sg.Checkbox("Enable GPU Usage", default=True, key="--use_gpu", enable_events=True)],
     [sg.Checkbox("Use Full Frame OCR", default=False, key="--use_fullframe", enable_events=True)],
     [sg.Checkbox("Enable Dual Zone OCR", default=False, key="--use_dual_zone", enable_events=True)],
     [sg.Checkbox("Enable Subtitle Alignment", default=False, key="enable_subtitle_alignment", enable_events=True)],
@@ -2166,10 +2153,8 @@ tab2_content = [
      sg.Combo([], key="--subtitle_alignment", size=(15, 1), readonly=True, enable_events=True, disabled=True)],
     [sg.Text("Zone 2 Alignment:", size=(38, 1), key='-LBL-SUBTITLE-ALIGNMENT2-'),
      sg.Combo([], key="--subtitle_alignment2", size=(15, 1), readonly=True, enable_events=True, disabled=True)],
-    [sg.Checkbox("Enable Angle Classification", default=False, key="--use_angle_cls", enable_events=True)],
     [sg.Checkbox("Enable Post Processing", default=False, key="--post_processing", enable_events=True)],
     [sg.Checkbox("Normalize Traditional to Simplified Chinese", default=True, key="--normalize_to_simplified_chinese", enable_events=True)],
-    [sg.Checkbox("Use Server Model", default=False, key="--use_server_model", enable_events=True)],
     [sg.HorizontalSeparator()],
     [sg.Text("VideOCR Settings:", font=("Arial", scale_font_size(10), "bold"), key='-LBL-VIDEOCR_SETTINGS-')],
     [

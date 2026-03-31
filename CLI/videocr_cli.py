@@ -127,7 +127,6 @@ def valid_alignment_name(arg: str) -> str | None:
 def main() -> None:
     parser = argparse.ArgumentParser(description='Extract subtitles from video using PaddleOCR.')
 
-    parser.add_argument('--google_credentials', type=str, default='', help='Path to Google Cloud credentials.json')
     parser.add_argument('--video_path', type=valid_video_path, required=True, help='Path to the video file')
     parser.add_argument('--output', type=valid_output_path, default='subtitle.srt', help='Output SRT file path (default: subtitle.srt)')
     parser.add_argument('--lang', type=valid_language, default='ch', help='OCR language (default: ch)')
@@ -137,9 +136,6 @@ def main() -> None:
     parser.add_argument('--sim_threshold', type=restricted_int(0, 100), default=80, help='Similarity threshold (default: 80)')
     parser.add_argument('--max_merge_gap', type=restricted_float(min_val=0.0), default=0.09, help='Maximum time gap in seconds to merge similar subtitles (default: 0.09)')
     parser.add_argument('--use_fullframe', type=lambda x: x.lower() == 'true', default=False, help='Use full frame for OCR (default: false)')
-    parser.add_argument('--use_gpu', type=lambda x: x.lower() == 'true', default=False, help='Enable GPU usage (default: false)')
-    parser.add_argument('--use_angle_cls', type=lambda x: x.lower() == 'true', default=False, help='Enable Classification (default: false)')
-    parser.add_argument('--use_server_model', type=lambda x: x.lower() == 'true', default=False, help='Enable usage of server model (default: false)')
     parser.add_argument('--brightness_threshold', type=restricted_int(0, 255), default=None, help='Brightness threshold')
     parser.add_argument('--ssim_threshold', type=restricted_int(0, 100), default=92, help='SSIM similarity threshold (default: 92)')
     parser.add_argument('--subtitle_position', type=str, default='center', help='Subtitle position alignment (center (default), left, right, any)')
@@ -201,7 +197,6 @@ def main() -> None:
 
         with keep_awake_manager:
             save_subtitles_to_file(
-                google_credentials=args.google_credentials,
                 video_path=args.video_path,
                 file_path=args.output,
                 lang=args.lang,
@@ -211,9 +206,6 @@ def main() -> None:
                 sim_threshold=args.sim_threshold,
                 max_merge_gap_sec=args.max_merge_gap,
                 use_fullframe=args.use_fullframe,
-                use_gpu=args.use_gpu,
-                use_angle_cls=args.use_angle_cls,
-                use_server_model=args.use_server_model,
                 brightness_threshold=args.brightness_threshold,
                 ssim_threshold=args.ssim_threshold,
                 subtitle_position=args.subtitle_position,

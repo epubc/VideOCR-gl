@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import io
-from google.cloud import vision
-
 import ast
 import os
 import queue
@@ -115,11 +113,7 @@ class Video:
     path: str
     lang: str
     use_fullframe: bool
-    paddleocr_path: str
     post_processing: bool
-    det_model_dir: str
-    rec_model_dir: str
-    cls_model_dir: str
     duration_ms: int
     height: int
     width: int
@@ -131,12 +125,8 @@ class Video:
     start_time_offset_ms: float
     avg_frame_duration_ms: float
 
-    def __init__(self, path: str, paddleocr_path: str, det_model_dir: str, rec_model_dir: str, cls_model_dir: str) -> None:
+    def __init__(self, path: str) -> None:
         self.path = path
-        self.paddleocr_path = paddleocr_path
-        self.det_model_dir = det_model_dir
-        self.rec_model_dir = rec_model_dir
-        self.cls_model_dir = cls_model_dir
         self.frame_timestamps = {}
         self.start_time_offset_ms = 0.0
         self.avg_frame_duration_ms = 0.0
@@ -147,10 +137,10 @@ class Video:
         self.duration_ms = props['duration_ms']
         self.start_time_offset_ms = props['start_time_offset_ms']
 
-    def run_ocr(self, use_gpu: bool, lang: str, use_angle_cls: bool, time_start: str, time_end: str, conf_threshold: int,
+    def run_ocr(self, lang: str, time_start: str, time_end: str, conf_threshold: int,
                 use_fullframe: bool, brightness_threshold: int | None, ssim_threshold: int, subtitle_position: str,
                 frames_to_skip: int, crop_zones: list[dict], ocr_image_max_width: int, normalize_to_simplified_chinese: bool,
-                google_credentials: str, threads: int = 6) -> None:
+                threads: int = 6) -> None:
         conf_threshold_ratio = conf_threshold / 100
         ssim_threshold_ratio = ssim_threshold / 100
         self.lang = lang
